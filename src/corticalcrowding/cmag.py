@@ -7,7 +7,7 @@ import numpy as np
 import neuropythy as ny
 from scipy.spatial import KDTree
 from scipy.optimize import minimize
-
+from .config import proc_path
 
 # Load subjects ###############################################################
 def load_subject(sid, proc_path = proc_path, rater = 'Linda'):
