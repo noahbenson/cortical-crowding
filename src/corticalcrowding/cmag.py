@@ -7,10 +7,15 @@ import numpy as np
 import neuropythy as ny
 from scipy.spatial import KDTree
 from scipy.optimize import minimize
-from .config import proc_path
+from .config import (NEI_proc_path, NYU_proc_path)
 
 # Load subjects ###############################################################
-def load_subject(sid, proc_path = proc_path, rater = 'Linda'):
+NEI_raters = ('Linda', 'Brenda', 'Jan')
+def load_NEI_subject(sid,
+                     proc_path=NEI_proc_path,
+                     rater=NEI_raters):
+    if isinstance(rater, str):
+        rater = (rater,)
     freesurfer_path = proc_path/'freesurfer'/sid
     sub = ny.freesurfer_subject(str(freesurfer_path))
     roi_path = proc_path/'rois'
@@ -23,10 +28,47 @@ def load_subject(sid, proc_path = proc_path, rater = 'Linda'):
         tmp['eccentricity'] = ny.load(str(prf_path/f'{h}.eccen.mgz'))
         tmp['radius'] = ny.load(str(prf_path/f'{h}.sigma.mgz'))
         tmp['variance_explained'] = ny.load(str(prf_path/f'{h}.vexpl.mgz'))
-        tmp['visual_area'] = ny.load(str(roi_path/f'{rater}_{h}.{sid}.ROIs_V1-4.mgz'))
+        for r in rater:
+            try:
+                path = roi_path/f'{r}_{h}.{sid}.ROIs_V1-4.mgz'
+                tmp['visual_area'] = ny.load(str(path))
+            except Exception:
+                continue
+        if 'visual_area' not in tmp:
+            raise RuntimeError(
+                f"no boundaries found for any raters for subject"
+                f" {sid}, hemi {h}")
         prf_data[h] = hem.with_prop(tmp)
     sub = sub.with_hemi(prf_data) 
-    return sub   
+    return sub
+def load_NYU_subject(sid, proc_path=NYU_proc_path):
+    freesurfer_path = proc_path/'freesurfer'/sid
+    sub = ny.freesurfer_subject(str(freesurfer_path), check_path=False)
+    roi_path = proc_path/'ROIs'/sid
+    prf_path = proc_path/'prfanalyze-vista'/sid/'ses-nyu3t01'
+    prf_data = {}
+    for h in ('lh','rh'):
+        hem = sub.hemis[h]
+        tmp = {}
+        tmp['polar_angle'] = ny.load(str(prf_path/f'{h}.angle_adj.mgz'))
+        tmp['eccentricity'] = ny.load(str(prf_path/f'{h}.eccen.mgz'))
+        tmp['radius'] = ny.load(str(prf_path/f'{h}.sigma.mgz'))
+        tmp['variance_explained'] = ny.load(str(prf_path/f'{h}.vexpl.mgz'))
+        path = roi_path/f'{h}.ROIs_V1-4.mgz'
+        tmp['visual_area'] = ny.load(str(path))
+        prf_data[h] = hem.with_prop(tmp)
+    sub = sub.with_hemi(prf_data) 
+    return sub
+def load_subject(sid, proc_path=None, rater=NEI_raters):
+    if sid == 'sub-wlsubj114':
+        if proc_path is None:
+            proc_path = NYU_proc_path
+        return load_NYU_subject(sid, proc_path=proc_path)
+    else:
+        if proc_path is None:
+            proc_path = NEI_proc_path
+        return load_NEI_subject(sid, proc_path=proc_path, rater=rater)
+
 
 # Horton & Hoyt, 1991 ##########################################################
 
