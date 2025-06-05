@@ -16,10 +16,12 @@ def load_NEI_subject(sid,
                      rater=NEI_raters):
     if isinstance(rater, str):
         rater = (rater,)
-    freesurfer_path = proc_path/'freesurfer'/sid
+    # freesurfer_path = proc_path/'freesurfer'/sid
+    freesurfer_path = proc_path/'freesurfer'/str(sid)
     sub = ny.freesurfer_subject(str(freesurfer_path))
     roi_path = proc_path/'rois'
-    prf_path = proc_path/'prfvista'/sid/'ses-nyu3t01'
+    # changed to str(sid) here too
+    prf_path = proc_path/'prfvista'/str(sid)/'ses-nyu3t01'
     prf_data = {}
     for h in ('lh','rh'):
         hem = sub.hemis[h]
