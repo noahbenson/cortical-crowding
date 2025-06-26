@@ -1,0 +1,38 @@
+[project]
+name = "corticalcrowding"
+version = "0.1.0.dev1"
+description = """Analysis of crowding in terms of cortical magnification."""
+authors = [
+    {name="Zelin Zhao", email="zz3130@nyu.edu"},
+    {name="Noah C. Benson", email="nben@uw.edu"}]
+license = {"text"="MIT"}
+readme = "README.md"
+requires-python = ">=3.8"
+keywords = ["vision", "crowding", "cortex", "MRI", "brain"]
+classifiers = [
+    'Intended Audience :: Science/Research',
+    'License :: OSI Approved :: MIT License',
+    'Programming Language :: Python :: 3',
+    'Programming Language :: Python :: 3.8',
+    'Programming Language :: Python :: 3.9',
+    'Programming Language :: Python :: 3.10',
+    'Programming Language :: Python :: 3.11',
+    'Programming Language :: Python :: 3.12',
+    'Programming Language :: Python :: 3.13',
+    'Topic :: Scientific/Engineering',
+    'Topic :: Scientific/Engineering :: Information Analysis',
+    'Operating System :: Microsoft :: Windows',
+    'Operating System :: POSIX',
+    'Operating System :: Unix',
+    'Operating System :: MacOS']
+dependencies = [
+     'numpy >= 1.24.0',
+     'scipy >= 1.7.0',
+     'matplotlib >= 3.8.0',
+     'pandas >= 2.2.0',
+     'neuropythy >= 0.12.16']
+
+[project.urls]
+homepage = "https://github.com/noahbenson/cortical-crowding"
+documentation = "https://github.com/noahbenson/cortical-crowding"
+repository = "https://github.com/noahbenson/cortical-crowding"

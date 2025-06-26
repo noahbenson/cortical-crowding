@@ -81,10 +81,36 @@ def HH91(x, a=17.3, b=0.75, c=2):
     x = np.asarray(x, dtype=np.float64)
     return (a / (b + x))**c
 
-def HH91_for_fit(x, a=17.3, b_sqrt=np.sqrt(0.75), c=2):
-    return HH91(x, a, b_sqrt**2, c)
+def HH91_integral(x, a=17.3, b=0.75):
+    """Calculates and returns the integral of the areal cortical magnification
+    function according to Horton and Hoyt (1991) from 0 to the given
+    eccentricity value.
+    """
+    xb = x + b
+    return a**2 * np.pi * (np.log(xb / b) - x / xb)
 
-def fit_cmag(ecc, cmag, p0=[17.3, 0.75], method=None):
+def HH91_gain(totalarea, maxecc, b=0.75):
+    """Calculates the gain parameter of the Horton and Hoyt (1991) cortical
+    magnification function given the total cortical surface area, the maximum
+    eccentricity represented by that area, and the parameter `b`.
+    """
+    mb = maxecc + b
+    return np.sqrt(totalarea / np.pi / (np.log(mb / b) - maxecc/mb))
+
+def HH91_for_fit(x, a=17.3, b_log=np.log(0.75), c=2):
+    """Identical to ``HH91`` function except that instead of parameter ``b``,
+    ``HH91_for_fit`` uses parameter ``b_log=log(0.65)`` and uses the
+    exponential of `b_log` as the ``b`` parameter.
+
+    ``HH91_for_fit(x, a, b_log, c)`` is equivalent to:
+    ``HH91(x, a, exp(b_log), c)``.
+    """
+    return HH91(x, a, np.exp(b_log), c)
+
+def HH91_fit(ecc, cmag, p0=[17.3, 0.75], method=None):
+    """Fits the Horton and Hoyt (1991) cortical magnification function to the
+    given measurement data.
+    """
     ecc = ecc.astype(np.float64)
     cmag = cmag.astype(np.float64)
     def func(params):
@@ -97,6 +123,59 @@ def fit_cmag(ecc, cmag, p0=[17.3, 0.75], method=None):
     params = list(result.x)
     params[1] = params[1]**2
     return params
+
+def HH91_fit_cumarea(ecc, srf,
+                     params0=(17.3, 0.75), fix_gain=False, method=None):
+    """Fits the Horton and Hoyt (1991) cortical magnification function to the
+    given eccentricity and surface area data using the method of cumulative
+    area.
+    """
+    from scipy.optimize import minimize
+    ecc = np.asarray(ecc, dtype=np.float64)
+    srf = np.asarray(srf, dtype=np.float64)
+    ii = np.argsort(ecc)
+    ecc = ecc[ii]
+    srf = srf[ii]
+    cumsrf = np.cumsum(srf)
+    params0 = list(params0)
+    params0[1] = np.log(params0[1])
+    if fix_gain:
+        def loss_vmag(params):
+            params = list(params)
+            params[1] = np.exp(params[1])
+            pred = HH91_integral(ecc, *params)
+            error = (pred - cumsrf)
+            return np.mean(error**2)
+    else:
+        maxecc = np.max(ecc)
+        totsrf = np.sum(srf)
+        def loss_vmag(params):
+            b = np.exp(params[0])
+            gain = HH91_gain(totsrf, maxecc, b)
+            pred = HH91_integral(ecc, gain, b)
+            error = (pred - cumsrf)
+            return np.mean(error**2)
+        if len(params0) == 2:
+            params0 = [params0[1]]
+    r = minimize(loss_vmag, params0, method=method)
+    if len(params0) == 1:
+        b = np.exp(r.x[0])
+        gain = HH91_gain(totsrf, maxecc, b)
+        r.x = np.array([gain, b])
+    else:
+        r.x[0] = abs(r.x[0])
+        r.x[1] = np.exp(r.x[1])
+    r.coords = np.array([ecc, srf])
+    return r
+
+def fit_cumarea(sid, h, label):
+    (ecc,srf) = cmag_basics(sid, h, label)
+    if len(ecc) == 0:
+        raise RuntimeError(f"no data found for {sid}:{h}:{label}")
+    r = fit_cumarea_data(ecc, srf)
+    r.coords = np.array([ecc, srf])
+    return r
+
 
 # Calculate cortical magnification ##########################################################
 
