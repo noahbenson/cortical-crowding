@@ -1,5 +1,8 @@
 #ignore archive directory
 
+.DS_Store
+.DS_store
+
 archive/
 
 # Byte-compiled / optimized / DLL files
