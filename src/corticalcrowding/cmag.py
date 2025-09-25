@@ -61,6 +61,7 @@ def load_NYU_subject(sid, proc_path=NYU_proc_path):
         prf_data[h] = hem.with_prop(tmp)
     sub = sub.with_hemi(prf_data) 
     return sub
+
 def load_subject(sid, proc_path=None, rater=NEI_raters):
     if sid == 'sub-wlsubj114':
         if proc_path is None:
@@ -168,16 +169,79 @@ def HH91_fit_cumarea(ecc, srf,
     r.coords = np.array([ecc, srf])
     return r
 
-def fit_cumarea(sid, h, label):
+
+def cmag_basics(sid, h, label,
+                minecc=0, maxecc=12,
+                mincod=0.04):
+    """Loads the basic cortical magnification data for a subject and returns it.
+    
+    The data is returned as ``(ecc, srf)`` where ``ecc`` is the eccentricity values
+    and ``srf`` is the surface area values within the given visual area.
+    """
+    sub = load_subject(sid)
+    hem = sub.hemis[h]
+    mask_nocod = {
+        'and': [
+            ('eccentricity', minecc, maxecc),
+            ('visual_area', label)]}
+    mask_cod = {'and': mask_nocod['and'] + [('variance_explained', mincod, 1)]}
+    rdat = ny.retinotopy_data(hem)
+    mask_ii = hem.mask(mask_cod)
+    ecc = rdat['eccentricity'][mask_ii]
+    srf = hem.prop('midgray_surface_area')
+    totarea = np.sum(srf[hem.mask(mask_nocod)])
+    srf = srf[mask_ii]
+    ii = np.argsort(ecc)
+    ecc = ecc[ii]
+    srf = srf[ii] * totarea / np.sum(srf)
+    return (ecc, srf)
+
+def fit_cumarea(sid, h, label,
+                params0=(17.3, 0.75), fix_gain=False, method=None):
+    """Given a subject, hemisphere, and label, fit the Horton and Hoyt (1991)
+    cortical magnification function to the retinotopic mapping data using the
+    method of cumulative area.
+    """
     (ecc,srf) = cmag_basics(sid, h, label)
     if len(ecc) == 0:
         raise RuntimeError(f"no data found for {sid}:{h}:{label}")
-    r = fit_cumarea_data(ecc, srf)
-    r.coords = np.array([ecc, srf])
+    r = HH91_fit_cumarea(
+        ecc, srf,
+        params0=params0,
+        fix_gain=fix_gain,
+        method=method)
     return r
 
+# check quality of fits #####################################################################################
+def signed_bounds_from_abs_ranking(diff_mtx, pct):
+    n_subj, n_ecc = diff_mtx.shape
+    low  = np.full(n_ecc, np.nan)
+    high = np.full(n_ecc, np.nan)
 
-# Calculate cortical magnification ##########################################################
+    for k in range(n_ecc):
+        # diffs across subjects at that single eccentricity
+        col = diff_mtx[:, k]
+        col = col[np.isfinite(col)]
+        # assign a percentile rank (based on abs(diff))
+        ordering = np.argsort(np.abs(col))
+        ranks = np.linspace(0, 100, len(col))
+        # avoid overwrite in place
+        percentiles = np.empty_like(ranks)
+        percentiles[ordering] = ranks
+        # keep those within the target percentile
+        subset = col[percentiles <= pct]
+        if subset.size == 0:
+            continue
+        low[k]  = np.min(subset)
+        high[k] = np.max(subset)
+
+    return low, high
+
+
+
+
+#############################################################
+# Other methods to calculate cortical magnification (not used in current project) #############################################################
 
 def ring_area_deg2(min_eccen, max_eccen, hemifield=False):
     """Computes the area (in square degrees) of a ring in the visual field."""
@@ -300,3 +364,11 @@ def calculate_cortical_magnification(df):
             for mask_value in [1, 2, 3, 4]:
                 cortical_magnifications[mask_value].append(np.nan)  # Assign NaN if an exception occurs
     return cortical_magnifications
+
+# def fit_cumarea(sid, h, label):
+#     (ecc,srf) = cmag_basics(sid, h, label)
+#     if len(ecc) == 0:
+#         raise RuntimeError(f"no data found for {sid}:{h}:{label}")
+#     r = fit_cumarea_data(ecc, srf)
+#     r.coords = np.array([ecc, srf])
+#     return r
