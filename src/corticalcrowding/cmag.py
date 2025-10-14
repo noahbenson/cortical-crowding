@@ -202,7 +202,16 @@ def fit_cumarea(sid, h, label,
     cortical magnification function to the retinotopic mapping data using the
     method of cumulative area.
     """
-    (ecc,srf) = cmag_basics(sid, h, label)
+    if h == 'lr':
+        (lh_ecc, lh_srf) = cmag_basics(sid, 'lh', label)
+        (rh_ecc, rh_srf) = cmag_basics(sid, 'rh', label)
+        ecc = np.concatenate([lh_ecc, rh_ecc])
+        srf = np.concatenate([lh_srf, rh_srf])
+        # We divide srf by 2 because the fitting functions assume 1/2 of the
+        # visual field. This results in the same parameter scale for lr rows.
+        srf /= 2
+    else:        
+        (ecc,srf) = cmag_basics(sid, h, label)
     if len(ecc) == 0:
         raise RuntimeError(f"no data found for {sid}:{h}:{label}")
     r = HH91_fit_cumarea(
