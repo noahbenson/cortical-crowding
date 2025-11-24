@@ -119,7 +119,7 @@ def HH91_fit(ecc, cmag, p0=[17.3, 0.75], method=None):
         error = (cmag/pred - 1)**2 + (pred/cmag - 1)**2
         return np.sum(error)
     p0 = list(p0)
-    p0[1] = np.sqrt(p0[1])
+    p0[1] = np.log(p0[1])
     result = minimize(func, p0, method=method)
     params = list(result.x)
     params[1] = params[1]**2
@@ -170,13 +170,99 @@ def HH91_fit_cumarea(ecc, srf,
     return r
 
 
+## Inverse Superlinear Model ###################################################
+
+def invsuplin(r, /, g=5.05, h=0.43, q=0.06):
+    """Calculates the areal cortical magniifcation according to the inverse
+    superlinear function.
+
+    The inverse superlinear function is parameterized as follows:
+      ``s(r, g, h, q) = g / (h + r + q*r**2)``
+    """
+    r = np.asarray(r, dtype=np.float64)
+    return (g / (h + r + q*r**2))
+
+def invsuplin_integral(r, /, g=5.05, h=0.43, q=0.06):
+    """Calculates and returns the integral of the areal cortical magnification
+    function according to inverse superlinear function from 0 to the given
+    eccentricity value.
+    """
+    if q == 0:
+        return HH91_integral(r, g, h)
+    r = np.asarray(r, dtype=np.float64)
+    num = 2*q*r + 1
+    den = 4*h*q - 1
+    sqrtden = np.sqrt(den)
+    const = g**2 * np.pi / den
+    val = r*num / (h + r + q*r**2)
+    val += 2/sqrtden * (np.pi/2 - np.arctan(sqrtden) - np.arctan(num / sqrtden))
+    return const * val
+
+def invsuplin_for_fit(x, /, g=5.05, h_log=np.log(0.43), q=0.06):
+    """Identical to ``invsuplin`` function except that instead of parameter
+    ``h``, ``invsuplin_for_fit`` uses parameter ``h_log=log(0.43)`` and uses the
+    exponential of `h_log` as the ``h`` parameter.
+
+    ``invsuplin_for_fit(x, g, h_log, q)`` is equivalent to:
+    ``invsuplin(x, g, exp(h_log), q)``.
+
+    """
+    return invsuplin(x, g, np.exp(h_log), q)
+
+def invsuplin_fit(ecc, cmag, p0=[5.05, 0.43, 0.06], method=None):
+    """Fits the inverse superlinear cortical magnification function to the
+    given measurement data.
+    """
+    ecc = np.asarray(ecc, dtype=np.float64)
+    cmag = np.asarray(cmag, dtype=np.float64)
+    def func(params):
+        pred = invsuplin_for_fit(ecc, *params)
+        error = (cmag/pred - 1)**2 + (pred/cmag - 1)**2
+        return np.sum(error)
+    p0 = list(p0)
+    p0[1] = np.log(p0[1])
+    result = minimize(func, p0, method=method)
+    params = list(result.x)
+    params[1] = params[1]**2
+    return params
+
+def invsuplin_fit_cumarea(ecc, srf,
+                          params0=(5.05, 0.43, 0.06),
+                          method=None):
+    """Fits the inverse superlinear cortical magnification function to the
+    given eccentricity and surface area data using the method of cumulative
+    area.
+    """
+    from scipy.optimize import minimize
+    ecc = np.asarray(ecc, dtype=np.float64)
+    srf = np.asarray(srf, dtype=np.float64)
+    ii = np.argsort(ecc)
+    ecc = ecc[ii]
+    srf = srf[ii]
+    cumsrf = np.cumsum(srf)
+    params0 = list(params0)
+    params0[1] = np.log(params0[1])
+    def loss_vmag(params):
+        params = list(params)
+        params[1] = np.exp(params[1])
+        pred = invsuplin_integral(ecc, *params)
+        error = (pred - cumsrf)
+        return np.mean(error**2)
+    r = minimize(loss_vmag, params0, method=method)
+    r.x[0] = abs(r.x[0])
+    r.x[1] = np.exp(r.x[1])
+    r.coords = np.array([ecc, srf])
+    return r
+
+
 def cmag_basics(sid, h, label,
                 minecc=0, maxecc=12,
                 mincod=0.04):
     """Loads the basic cortical magnification data for a subject and returns it.
     
-    The data is returned as ``(ecc, srf)`` where ``ecc`` is the eccentricity values
-    and ``srf`` is the surface area values within the given visual area.
+    The data is returned as ``(ecc, srf)`` where ``ecc`` is the eccentricity
+    values and ``srf`` is the surface area values within the given visual area.
+
     """
     sub = load_subject(sid)
     hem = sub.hemis[h]
