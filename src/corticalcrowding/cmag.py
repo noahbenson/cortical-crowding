@@ -180,7 +180,7 @@ def invsuplin(r, /, g=5.05, h=0.43, q=0.06):
       ``s(r, g, h, q) = g / (h + r + q*r**2)``
     """
     r = np.asarray(r, dtype=np.float64)
-    return (g / (h + r + q*r**2))
+    return (g / (h + r + q*r**2))**2
 
 def invsuplin_integral(r, /, g=5.05, h=0.43, q=0.06):
     """Calculates and returns the integral of the areal cortical magnification
