@@ -192,13 +192,21 @@ def invsuplin_integral(r, /, g=5.05, h=0.43, q=0.06):
     r = np.asarray(r, dtype=np.float64)
     num = 2*q*r + 1
     den = 4*h*q - 1
-    sqrtden = np.sqrt(den)
-    const = g**2 * np.pi / den
     val = r*num / (h + r + q*r**2)
-    val += 2/sqrtden * (np.pi/2 - np.arctan(sqrtden) - np.arctan(num / sqrtden))
+    if den < 0:
+        sqrtden = np.sqrt(np.abs(den)) * 1j
+        u = np.arctan(1 / sqrtden) - np.arctan(num / sqrtden)
+        u *= 2/sqrtden
+        val += np.real_if_close(u)
+    else:
+        sqrtden = np.sqrt(den)
+        u = np.pi/2 - np.arctan(sqrtden) - np.arctan(num / sqrtden)
+        u *= 2/sqrtden
+        val += u
+    const = g**2 * np.pi / den
     return const * val
 
-def invsuplin_for_fit(x, /, g=5.05, h_log=np.log(0.43), q=0.06):
+def invsuplin_for_fit(x, /, g=5.05, h_log=np.log(0.43), q=np.sqrt(0.06)):
     """Identical to ``invsuplin`` function except that instead of parameter
     ``h``, ``invsuplin_for_fit`` uses parameter ``h_log=log(0.43)`` and uses the
     exponential of `h_log` as the ``h`` parameter.
@@ -207,7 +215,7 @@ def invsuplin_for_fit(x, /, g=5.05, h_log=np.log(0.43), q=0.06):
     ``invsuplin(x, g, exp(h_log), q)``.
 
     """
-    return invsuplin(x, g, np.exp(h_log), q)
+    return invsuplin(x, g, np.exp(h_log), q**2)
 
 def invsuplin_fit(ecc, cmag, p0=[5.05, 0.43, 0.06], method=None):
     """Fits the inverse superlinear cortical magnification function to the
@@ -221,6 +229,7 @@ def invsuplin_fit(ecc, cmag, p0=[5.05, 0.43, 0.06], method=None):
         return np.sum(error)
     p0 = list(p0)
     p0[1] = np.log(p0[1])
+    p0[2] = np.sqrt(p0[2])
     result = minimize(func, p0, method=method)
     params = list(result.x)
     params[1] = params[1]**2
