@@ -291,11 +291,16 @@ def cmag_basics(sid, h, label,
     srf = srf[ii] * totarea / np.sum(srf)
     return (ecc, srf)
 
+
+
 def fit_cumarea(sid, h, label,
-                params0=(17.3, 0.75), fix_gain=False, method=None):
-    """Given a subject, hemisphere, and label, fit the Horton and Hoyt (1991)
+                params0=(5.05, 0.43, 0.06),
+                fix_gain=False, 
+                method=None):
+    """Given a subject, hemisphere, and label, fit the inverse superlinear
     cortical magnification function to the retinotopic mapping data using the
     method of cumulative area.
+
     """
     if h == 'lr':
         (lh_ecc, lh_srf) = cmag_basics(sid, 'lh', label)
@@ -305,16 +310,44 @@ def fit_cumarea(sid, h, label,
         # We divide srf by 2 because the fitting functions assume 1/2 of the
         # visual field. This results in the same parameter scale for lr rows.
         srf /= 2
-    else:        
-        (ecc,srf) = cmag_basics(sid, h, label)
+    else:
+        (ecc, srf) = cmag_basics(sid, h, label)
+
     if len(ecc) == 0:
         raise RuntimeError(f"no data found for {sid}:{h}:{label}")
-    r = HH91_fit_cumarea(
+
+    r = invsuplin_fit_cumarea(
         ecc, srf,
         params0=params0,
-        fix_gain=fix_gain,
-        method=method)
+        method=method
+    )
     return r
+
+
+# def fit_cumarea(sid, h, label,
+#                 params0=(17.3, 0.75), fix_gain=False, method=None):
+#     """Given a subject, hemisphere, and label, fit the Horton and Hoyt (1991)
+#     cortical magnification function to the retinotopic mapping data using the
+#     method of cumulative area.
+#     """
+#     if h == 'lr':
+#         (lh_ecc, lh_srf) = cmag_basics(sid, 'lh', label)
+#         (rh_ecc, rh_srf) = cmag_basics(sid, 'rh', label)
+#         ecc = np.concatenate([lh_ecc, rh_ecc])
+#         srf = np.concatenate([lh_srf, rh_srf])
+#         # We divide srf by 2 because the fitting functions assume 1/2 of the
+#         # visual field. This results in the same parameter scale for lr rows.
+#         srf /= 2
+#     else:        
+#         (ecc,srf) = cmag_basics(sid, h, label)
+#     if len(ecc) == 0:
+#         raise RuntimeError(f"no data found for {sid}:{h}:{label}")
+#     r = HH91_fit_cumarea(
+#         ecc, srf,
+#         params0=params0,
+#         fix_gain=fix_gain,
+#         method=method)
+#     return r
 
 # check quality of fits #####################################################################################
 def signed_bounds_from_abs_ranking(diff_mtx, pct):
