@@ -126,7 +126,8 @@ def HH91_fit(ecc, cmag, p0=[17.3, 0.75], method=None):
     return params
 
 def HH91_fit_cumarea(ecc, srf,
-                     params0=(17.3, 0.75), fix_gain=False, method=None):
+                     params0=(17.3, 0.75), fix_gain=False, method=None,
+                     minecc=1, maxecc=10):
     """Fits the Horton and Hoyt (1991) cortical magnification function to the
     given eccentricity and surface area data using the method of cumulative
     area.
@@ -138,6 +139,10 @@ def HH91_fit_cumarea(ecc, srf,
     ecc = ecc[ii]
     srf = srf[ii]
     cumsrf = np.cumsum(srf)
+    minecc = 0 if minecc is None else minecc
+    maxecc = np.inf if maxecc is None else maxecc
+    jj = (ecc >= minecc) & (ecc <= maxecc)
+    (ecc, cumsrf, srf) = (ecc[jj], cumsrf[jj], srf[jj])
     params0 = list(params0)
     params0[1] = np.log(params0[1])
     if fix_gain:
@@ -166,7 +171,7 @@ def HH91_fit_cumarea(ecc, srf,
     else:
         r.x[0] = abs(r.x[0])
         r.x[1] = np.exp(r.x[1])
-    r.coords = np.array([ecc, srf])
+    r.coords = np.array([ecc, cumsrf])
     return r
 
 
@@ -189,7 +194,7 @@ def invsuplin_integral(r, /, g=5.05, h=0.43, q=0.06):
     """
     if q == 0:
         return HH91_integral(r, g, h)
-    r = np.asarray(r, dtype=np.float64)
+    r = np.asarray(r, dtype=np.complex64)
     num = 2*q*r + 1
     den = 4*h*q - 1
     val = r*num / (h + r + q*r**2)
@@ -197,14 +202,14 @@ def invsuplin_integral(r, /, g=5.05, h=0.43, q=0.06):
         sqrtden = np.sqrt(np.abs(den)) * 1j
         u = np.arctan(1 / sqrtden) - np.arctan(num / sqrtden)
         u *= 2/sqrtden
-        val += np.real_if_close(u)
+        val += u
     else:
         sqrtden = np.sqrt(den)
         u = np.pi/2 - np.arctan(sqrtden) - np.arctan(num / sqrtden)
         u *= 2/sqrtden
         val += u
     const = g**2 * np.pi / den
-    return const * val
+    return np.real_if_close(const * val)
 
 def invsuplin_for_fit(x, /, g=5.05, h_log=np.log(0.43), q=np.sqrt(0.06)):
     """Identical to ``invsuplin`` function except that instead of parameter
@@ -237,7 +242,8 @@ def invsuplin_fit(ecc, cmag, p0=[5.05, 0.43, 0.06], method=None):
 
 def invsuplin_fit_cumarea(ecc, srf,
                           params0=(5.05, 0.43, 0.06),
-                          method=None):
+                          method=None,
+                          minecc=1, maxecc=10):
     """Fits the inverse superlinear cortical magnification function to the
     given eccentricity and surface area data using the method of cumulative
     area.
@@ -249,6 +255,10 @@ def invsuplin_fit_cumarea(ecc, srf,
     ecc = ecc[ii]
     srf = srf[ii]
     cumsrf = np.cumsum(srf)
+    minecc = 0 if minecc is None else minecc
+    maxecc = np.inf if maxecc is None else maxecc
+    jj = (ecc >= minecc) & (ecc <= maxecc)
+    (ecc, cumsrf, srf) = (ecc[jj], cumsrf[jj], srf[jj])
     params0 = list(params0)
     params0[1] = np.log(params0[1])
     def loss_vmag(params):
@@ -260,7 +270,7 @@ def invsuplin_fit_cumarea(ecc, srf,
     r = minimize(loss_vmag, params0, method=method)
     r.x[0] = abs(r.x[0])
     r.x[1] = np.exp(r.x[1])
-    r.coords = np.array([ecc, srf])
+    r.coords = np.array([ecc, cumsrf])
     return r
 
 
@@ -291,8 +301,9 @@ def cmag_basics(sid, h, label,
     srf = srf[ii] * totarea / np.sum(srf)
     return (ecc, srf)
 
-def fit_cumarea(sid, h, label,
-                params0=(17.3, 0.75), fix_gain=False, method=None):
+def fit_cumarea(sid, h, label, model='HH91',
+                params0=(17.3, 0.75), fix_gain=False, method=None,
+                minecc=1, maxecc=10):
     """Given a subject, hemisphere, and label, fit the Horton and Hoyt (1991)
     cortical magnification function to the retinotopic mapping data using the
     method of cumulative area.
@@ -309,11 +320,19 @@ def fit_cumarea(sid, h, label,
         (ecc,srf) = cmag_basics(sid, h, label)
     if len(ecc) == 0:
         raise RuntimeError(f"no data found for {sid}:{h}:{label}")
-    r = HH91_fit_cumarea(
+    if model == 'HH91':
+        fn = HH91_fit_cumarea
+    elif model == 'invsuplin':
+        fn = invsuplin_fit_cumarea
+    else:
+        raise ValueError("model must be 'HH91' or 'invsuplin'")
+    r = fn(
         ecc, srf,
         params0=params0,
         fix_gain=fix_gain,
-        method=method)
+        method=method,
+        minecc=minecc,
+        maxecc=maxecc)
     return r
 
 # check quality of fits #####################################################################################
