@@ -126,7 +126,8 @@ def HH91_fit(ecc, cmag, p0=[17.3, 0.75], method=None):
     return params
 
 def HH91_fit_cumarea(ecc, srf,
-                     params0=(17.3, 0.75), fix_gain=False, method=None,
+                     params0=(17.3, 0.75), fix_gain=False,
+                     method=None, options=None,
                      minecc=1, maxecc=10):
     """Fits the Horton and Hoyt (1991) cortical magnification function to the
     given eccentricity and surface area data using the method of cumulative
@@ -163,7 +164,7 @@ def HH91_fit_cumarea(ecc, srf,
             return np.mean(error**2)
         if len(params0) == 2:
             params0 = [params0[1]]
-    r = minimize(loss_vmag, params0, method=method)
+    r = minimize(loss_vmag, params0, method=method, options=options)
     if len(params0) == 1:
         b = np.exp(r.x[0])
         gain = HH91_gain(totsrf, maxecc, b)
@@ -187,29 +188,33 @@ def invsuplin(r, /, g=5.05, h=0.43, q=0.06):
     r = np.asarray(r, dtype=np.float64)
     return (g / (h + r + q*r**2))**2
 
-def invsuplin_integral(r, /, g=5.05, h=0.43, q=0.06):
+def invsuplin_integral(r, /, g=5.05, h=0.43, q=0.06, *, tol=0.0001):
     """Calculates and returns the integral of the areal cortical magnification
     function according to inverse superlinear function from 0 to the given
     eccentricity value.
     """
-    if q == 0:
+    g = np.float128(g)
+    h = np.float128(h)
+    q = np.float128(q)
+    den = np.asarray(4*h*q - 1, dtype=np.complex128)
+    if q == 0 or den == -1:
         return HH91_integral(r, g, h)
-    r = np.asarray(r, dtype=np.complex64)
+    r = np.asarray(r, dtype=np.complex128)
     num = 2*q*r + 1
-    den = 4*h*q - 1
     val = r*num / (h + r + q*r**2)
-    if den < 0:
-        sqrtden = np.sqrt(np.abs(den)) * 1j
-        u = np.arctan(1 / sqrtden) - np.arctan(num / sqrtden)
-        u *= 2/sqrtden
-        val += u
+    sqrtden = np.sqrt(den)
+    if sqrtden == 0:
+        u = 0
     else:
-        sqrtden = np.sqrt(den)
         u = np.pi/2 - np.arctan(sqrtden) - np.arctan(num / sqrtden)
+        if not np.isfinite(u).all():
+            raise ValueError(
+                f"invsuplin parameters g={g}, h={h}, q={q} produced infj")
         u *= 2/sqrtden
-        val += u
+    val += u
     const = g**2 * np.pi / den
-    return np.real_if_close(const * val)
+    val = np.real_if_close(const * val, tol=tol)
+    return val
 
 def invsuplin_for_fit(x, /, g=5.05, h_log=np.log(0.43), q=np.sqrt(0.06)):
     """Identical to ``invsuplin`` function except that instead of parameter
@@ -240,9 +245,13 @@ def invsuplin_fit(ecc, cmag, p0=[5.05, 0.43, 0.06], method=None):
     params[1] = params[1]**2
     return params
 
+def halfsig(x):
+    return 2/(1 + np.exp(-x**2)) - 1
+def halflog(x):
+    return np.sqrt(-np.log(2/(x + 1) - 1))
 def invsuplin_fit_cumarea(ecc, srf,
                           params0=(5.05, 0.43, 0.06),
-                          method=None,
+                          method=None, options=None, tol=0.0001,
                           minecc=1, maxecc=10):
     """Fits the inverse superlinear cortical magnification function to the
     given eccentricity and surface area data using the method of cumulative
@@ -259,18 +268,29 @@ def invsuplin_fit_cumarea(ecc, srf,
     maxecc = np.inf if maxecc is None else maxecc
     jj = (ecc >= minecc) & (ecc <= maxecc)
     (ecc, cumsrf, srf) = (ecc[jj], cumsrf[jj], srf[jj])
+    ecc = np.asarray(ecc, dtype=np.complex128)
     params0 = list(params0)
+    params0[0] = np.log(params0[0])
     params0[1] = np.log(params0[1])
-    def loss_vmag(params):
-        params = list(params)
-        params[1] = np.exp(params[1])
-        pred = invsuplin_integral(ecc, *params)
+    params0[2] = halflog(params0[2])
+    def lossfn(params):
+        (g, h, q) = params
+        g = np.exp(g)
+        h = np.exp(h)
+        q = halfsig(q)
+        pred = invsuplin_integral(ecc, g=g, h=h, q=q, tol=tol)
+        pred = np.real_if_close(pred)
+        if np.iscomplexobj(pred):
+            raise ValueError(
+                f"params g={g}, h={h}, q={q} resulted in complex values")
         error = (pred - cumsrf)
         return np.mean(error**2)
-    r = minimize(loss_vmag, params0, method=method)
-    r.x[0] = abs(r.x[0])
+    r = minimize(lossfn, params0, method=method, options=options)
+    r.x[0] = np.exp(r.x[0])
     r.x[1] = np.exp(r.x[1])
+    r.x[2] = halfsig(r.x[2])
     r.coords = np.array([ecc, cumsrf])
+    r.lossfn = lossfn
     return r
 
 
@@ -305,8 +325,9 @@ def cmag_basics(sid, h, label,
 
 def fit_cumarea(sid, h, label,
                 params0=(5.05, 0.43, 0.06),
-                fix_gain=False, 
-                method=None):
+                method=None, options=None,
+                minecc=1,
+                maxecc=10):
     """Given a subject, hemisphere, and label, fit the inverse superlinear
     cortical magnification function to the retinotopic mapping data using the
     method of cumulative area.
@@ -326,7 +347,6 @@ def fit_cumarea(sid, h, label,
         srf /= 2
     else:
         (ecc, srf) = cmag_basics(sid, h, label)
-
     if len(ecc) == 0:
         raise RuntimeError(f"no data found for {sid}:{h}:{label}")
     if len(params0) == 2:
@@ -335,15 +355,13 @@ def fit_cumarea(sid, h, label,
         fn = invsuplin_fit_cumarea
     else:
         raise ValueError("params0 must contain 2 or 3 parameter values")
-    r = fn(
+    return fn(
         ecc, srf,
         params0=params0,
-        fix_gain=fix_gain,
         method=method,
+        options=options,
         minecc=minecc,
         maxecc=maxecc)
-    return r
-
 
 # def fit_cumarea(sid, h, label,
 #                 params0=(17.3, 0.75), fix_gain=False, method=None):
