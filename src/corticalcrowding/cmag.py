@@ -249,6 +249,10 @@ def halfsig(x):
     return 2/(1 + np.exp(-x**2)) - 1
 def halflog(x):
     return np.sqrt(-np.log(2/(x + 1) - 1))
+def sigmoid(x):
+    return 1 / (1 + np.exp(-x))
+def logit(p):
+    return np.log(p / (1 - p))
 def invsuplin_fit_cumarea(ecc, srf,
                           params0=(5.05, 0.43, 0.06),
                           method=None, options=None, tol=0.0001,
@@ -271,12 +275,14 @@ def invsuplin_fit_cumarea(ecc, srf,
     ecc = np.asarray(ecc, dtype=np.complex128)
     params0 = list(params0)
     params0[0] = np.log(params0[0])
-    params0[1] = np.log(params0[1])
+    #params0[1] = np.log(params0[1])
+    params0[1] = logit(params0[1] / 2)
     params0[2] = halflog(params0[2])
     def lossfn(params):
         (g, h, q) = params
         g = np.exp(g)
-        h = np.exp(h)
+        #h = np.exp(h)
+        h = 2 * sigmoid(h)
         q = halfsig(q)
         pred = invsuplin_integral(ecc, g=g, h=h, q=q, tol=tol)
         pred = np.real_if_close(pred)
