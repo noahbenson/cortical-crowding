@@ -256,7 +256,8 @@ def logit(p):
 def invsuplin_fit_cumarea(ecc, srf,
                           params0=(5.05, 0.43, 0.06),
                           method=None, options=None, tol=0.0001,
-                          minecc=1, maxecc=10):
+                          minecc=1, maxecc=10,
+                          h_max=3, q_max=1):
     """Fits the inverse superlinear cortical magnification function to the
     given eccentricity and surface area data using the method of cumulative
     area.
@@ -276,14 +277,13 @@ def invsuplin_fit_cumarea(ecc, srf,
     params0 = list(params0)
     params0[0] = np.log(params0[0])
     #params0[1] = np.log(params0[1])
-    params0[1] = logit(params0[1] / 2)
-    params0[2] = halflog(params0[2])
+    params0[1] = logit(params0[1] / h_max)
+    params0[2] = halflog(params0[2] / q_max)
     def lossfn(params):
         (g, h, q) = params
         g = np.exp(g)
-        #h = np.exp(h)
-        h = 2 * sigmoid(h)
-        q = halfsig(q)
+        h = h_max * sigmoid(h)
+        q = q_max * halfsig(q)
         pred = invsuplin_integral(ecc, g=g, h=h, q=q, tol=tol)
         pred = np.real_if_close(pred)
         if np.iscomplexobj(pred):
@@ -293,8 +293,8 @@ def invsuplin_fit_cumarea(ecc, srf,
         return np.mean(error**2)
     r = minimize(lossfn, params0, method=method, options=options)
     r.x[0] = np.exp(r.x[0])
-    r.x[1] = np.exp(r.x[1])
-    r.x[2] = halfsig(r.x[2])
+    r.x[1] = h_max * sigmoid(r.x[1])
+    r.x[2] = q_max * halfsig(r.x[2])
     r.coords = np.array([ecc, cumsrf])
     r.lossfn = lossfn
     return r
