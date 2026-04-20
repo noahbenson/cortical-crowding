@@ -394,6 +394,10 @@ def fit_cumarea(sid, h, label,
 #         method=method)
 #     return r
 
+######## normalization ############
+def norm_curve(curve, model_end):
+    return 100 * (curve - curve[0]) / (model_end - curve[0])
+
 # check quality of fits #####################################################################################
 def signed_bounds_from_abs_ranking(diff_mtx, pct):
     n_subj, n_ecc = diff_mtx.shape
