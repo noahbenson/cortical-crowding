@@ -479,7 +479,7 @@ def ring_cmag(sub, eccen = None, hemi=('lh','rh'), ring_size=None, retinotopy='a
     total_surface_area = np.sum(near_sarea, axis=1)
     area_vis = ring_area_deg2(min_eccen, max_eccen, hemifield=(len(hemi)==1))
     
-    return (eccen,total_surface_area / area_vis)
+    return ((min_eccen + max_eccen)/2, total_surface_area / area_vis)
 
 
 def bilateral_areal_cmag(sub, retinotopy='any', mask=None, hemi=('lh','rh'),
