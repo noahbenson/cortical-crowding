@@ -369,30 +369,6 @@ def fit_cumarea(sid, h, label,
         minecc=minecc,
         maxecc=maxecc)
 
-# def fit_cumarea(sid, h, label,
-#                 params0=(17.3, 0.75), fix_gain=False, method=None):
-#     """Given a subject, hemisphere, and label, fit the Horton and Hoyt (1991)
-#     cortical magnification function to the retinotopic mapping data using the
-#     method of cumulative area.
-#     """
-#     if h == 'lr':
-#         (lh_ecc, lh_srf) = cmag_basics(sid, 'lh', label)
-#         (rh_ecc, rh_srf) = cmag_basics(sid, 'rh', label)
-#         ecc = np.concatenate([lh_ecc, rh_ecc])
-#         srf = np.concatenate([lh_srf, rh_srf])
-#         # We divide srf by 2 because the fitting functions assume 1/2 of the
-#         # visual field. This results in the same parameter scale for lr rows.
-#         srf /= 2
-#     else:        
-#         (ecc,srf) = cmag_basics(sid, h, label)
-#     if len(ecc) == 0:
-#         raise RuntimeError(f"no data found for {sid}:{h}:{label}")
-#     r = HH91_fit_cumarea(
-#         ecc, srf,
-#         params0=params0,
-#         fix_gain=fix_gain,
-#         method=method)
-#     return r
 
 ######## normalization ############
 def norm_curve(curve, model_end):
@@ -425,9 +401,8 @@ def signed_bounds_from_abs_ranking(diff_mtx, pct):
 
 
 
-
-#############################################################
-# Other methods to calculate cortical magnification (not used in current project) #############################################################
+###############################################################################
+# Other methods for calculating cortical magnification
 
 def ring_area_deg2(min_eccen, max_eccen, hemifield=False):
     """Computes the area (in square degrees) of a ring in the visual field."""
@@ -534,27 +509,3 @@ def bilateral_areal_cmag(sub, retinotopy='any', mask=None, hemi=('lh','rh'),
         angs, eccs, sars,
         nnearest=nnearest,
         weight=None)
-
-# calculate cortical magnification based on x,y eccentricity given in a df
-def calculate_cortical_magnification(df):
-    cortical_magnifications = {1: [], 2: [], 3: [], 4: []}
-    for index, row in df.iterrows():
-        observer_id = row['ID']
-        try:
-            sub = load_subject(observer_id)
-            for mask_value in [1, 2, 3, 4]:
-                cm = bilateral_areal_cmag(sub, mask=('visual_area', mask_value))
-                cm_value = cm(row['Eccen_X'], row['Eccen_Y'])
-                cortical_magnifications[mask_value].append(cm_value)
-        except Exception as e:
-            for mask_value in [1, 2, 3, 4]:
-                cortical_magnifications[mask_value].append(np.nan)  # Assign NaN if an exception occurs
-    return cortical_magnifications
-
-# def fit_cumarea(sid, h, label):
-#     (ecc,srf) = cmag_basics(sid, h, label)
-#     if len(ecc) == 0:
-#         raise RuntimeError(f"no data found for {sid}:{h}:{label}")
-#     r = fit_cumarea_data(ecc, srf)
-#     r.coords = np.array([ecc, srf])
-#     return r
