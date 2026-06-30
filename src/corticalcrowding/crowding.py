@@ -10,7 +10,7 @@ def Kurzawski2023_cd(r, phi0, c, b):
     return (phi0 + r + c * r**2) * b
 
 def log_Kurzawski2023_cd(r, phi0, c, b):
-    return np.log10(Kurzawski2023_cd_3param(r, phi0, c, b))
+    return np.log10(Kurzawski2023_cd(r, phi0, c, b))
 
 def fit_scale_logspace(inv_cmag, crowding):
     """
