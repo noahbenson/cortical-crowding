@@ -85,6 +85,7 @@ def bootstrap_fit(sids, xdata, ydata, x, num_bootstrap_samples):
 
     return np.array(boot_curves), np.array(boot_params)
 
+### not used in the paper
 
 # bootstrap on coefficient of variation of cortical crowding distance
 def bootstrap_cv(data, num_samples=1000):
