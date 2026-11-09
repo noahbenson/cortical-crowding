@@ -6,6 +6,12 @@ import scipy.optimize
 from scipy.optimize import curve_fit
 from scipy.stats import gmean
 
+def bouma(r, phi0, b):
+    return (phi0 + r ) * b
+
+def log_bouma(r, phi0, b):
+    return np.log10(bouma(r, phi0, b))
+    
 def Kurzawski2023_cd(r, phi0, c, b):
     return (phi0 + r + c * r**2) * b
 
@@ -82,6 +88,42 @@ def bootstrap_fit(sids, xdata, ydata, x, num_bootstrap_samples):
 
         boot_params.append(popt)
         boot_curves.append(y_fit)
+
+    return np.array(boot_curves), np.array(boot_params)
+
+def bootstrap_fit_kur(kur_mean_cd, x, num_bootstrap_samples):
+    # Rows = observers; columns = 0° and 5°, len(cd) = 50
+    cd = kur_mean_cd.pivot(
+        index='Observer',
+        columns='RadialEccentricity',
+        values='CrowdingDistance'
+    )[[0, 5]].dropna().to_numpy()
+
+    boot_curves = []
+    boot_params = []
+
+    for _ in range(num_bootstrap_samples):
+
+        # Resample observers with replacement
+        sampled_indices = np.random.choice(
+            len(cd), size=len(cd), replace=True
+        )
+
+        # Geometric mean across sampled observers at each eccentricity
+        y_mean = gmean(cd[sampled_indices], axis=0)
+
+        try:
+            popt, _ = curve_fit(
+                log_bouma,
+                [0, 5],
+                np.log10(y_mean),
+                p0=[0.43, 0.15]
+            )
+        except RuntimeError:
+            continue
+
+        boot_params.append(popt)
+        boot_curves.append(bouma(x, *popt))
 
     return np.array(boot_curves), np.array(boot_params)
 
